@@ -34,6 +34,12 @@ const App = {
       btnCoach: document.getElementById('btn-coach'),
       btnImport: document.getElementById('btn-import'),
       btnExport: document.getElementById('btn-export'),
+      pgnModal: document.getElementById('pgn-modal'),
+      pgnInput: document.getElementById('pgn-input'),
+      pgnError: document.getElementById('pgn-error'),
+      pgnCancel: document.getElementById('pgn-cancel'),
+      pgnLoad: document.getElementById('pgn-load'),
+      toast: document.getElementById('toast'),
     };
   },
 
@@ -42,6 +48,13 @@ const App = {
     this.els.btnFlip.addEventListener('click', () => this.flipBoard());
     this.els.btnReset.addEventListener('click', () => this.resetGame());
     this.els.btnUndo.addEventListener('click', () => this.undoMove());
+    this.els.btnImport.addEventListener('click', () => this.openImportModal());
+    this.els.btnExport.addEventListener('click', () => this.exportPGN());
+    this.els.pgnCancel.addEventListener('click', () => this.closeImportModal());
+    this.els.pgnLoad.addEventListener('click', () => this.loadPGN());
+    this.els.pgnModal.addEventListener('click', (e) => {
+      if (e.target === this.els.pgnModal) this.closeImportModal();
+    });
 
     window.addEventListener('resize', () => this.board && this.board.resize());
   },
@@ -210,6 +223,63 @@ const App = {
     this.board.position(this.game.fen());
     this.updateMoveList();
     this.updateStatus();
+  },
+
+  openImportModal() {
+    this.els.pgnInput.value = '';
+    this.els.pgnError.hidden = true;
+    this.els.pgnModal.hidden = false;
+    this.els.pgnInput.focus();
+  },
+
+  closeImportModal() {
+    this.els.pgnModal.hidden = true;
+  },
+
+  loadPGN() {
+    const raw = this.els.pgnInput.value.trim();
+    if (!raw) {
+      this.els.pgnError.textContent = 'Please paste a PGN game.';
+      this.els.pgnError.hidden = false;
+      return;
+    }
+
+    const testGame = new Chess();
+    const success = testGame.load_pgn(raw, { sloppy: true });
+
+    if (!success) {
+      this.els.pgnError.textContent = 'Could not parse PGN. Check the format and try again.';
+      this.els.pgnError.hidden = false;
+      return;
+    }
+
+    this.game = testGame;
+    this.board.position(this.game.fen());
+    this.updateMoveList();
+    this.updateStatus();
+    this.closeImportModal();
+    this.showToast('Game loaded successfully');
+  },
+
+  exportPGN() {
+    const pgn = this.game.pgn();
+    if (!pgn) {
+      this.showToast('No moves to export');
+      return;
+    }
+
+    navigator.clipboard.writeText(pgn).then(
+      () => this.showToast('PGN copied to clipboard'),
+      () => this.showToast('Could not copy — check clipboard permissions')
+    );
+  },
+
+  showToast(message) {
+    const el = this.els.toast;
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
   },
 };
 
