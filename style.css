@@ -139,6 +139,30 @@ body {
   overflow: hidden;
 }
 
+/* ── Game Status ─────────────────────────────────────── */
+.game-status {
+  text-align: center;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 6px;
+}
+
+.status-check {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.status-checkmate {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.status-draw {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .board-controls {
   display: flex;
   gap: 0.4rem;
@@ -204,6 +228,38 @@ body {
   border-radius: 6px;
   border: 1px solid var(--border);
   color: var(--text-secondary);
+}
+
+/* ── Move Table ──────────────────────────────────────── */
+.move-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.move-table td {
+  padding: 0.15rem 0.4rem;
+}
+
+.move-num {
+  color: var(--text-secondary);
+  width: 2.5rem;
+  text-align: right;
+  opacity: 0.6;
+}
+
+.move-white,
+.move-black {
+  cursor: pointer;
+}
+
+.move-white:hover,
+.move-black:hover {
+  color: var(--accent);
+}
+
+.move-current td {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* ── Coach Messages ──────────────────────────────────── */
