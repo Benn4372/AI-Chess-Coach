@@ -110,8 +110,9 @@ const App = {
       this.els.evalLabel.style.opacity = '';
     });
 
-    // Tap-to-move on the board
-    this.els.board.addEventListener('click', (e) => this.onBoardClick(e));
+    // Tap-to-move: handle clicks on empty squares (pieces handled via onDragStart/onDrop)
+    this.els.board.addEventListener('mousedown', (e) => this.onEmptySquareClick(e));
+    this.els.board.addEventListener('touchstart', (e) => this.onEmptySquareClick(e));
 
     window.addEventListener('resize', () => this.board && this.board.resize());
   },
@@ -458,6 +459,33 @@ const App = {
     if (this.isViewingHistory()) return false;
     if (this.game.game_over()) return false;
 
+    // If a piece is already selected, handle tap-to-move logic
+    if (this.selectedSquare) {
+      // Tapped a legal target square that has a piece (capture)
+      const legalMoves = this.game.moves({ square: this.selectedSquare, verbose: true });
+      if (legalMoves.find(m => m.to === source)) {
+        setTimeout(() => this.executeTapMove(this.selectedSquare, source), 0);
+        return false;
+      }
+
+      // Tapped a different own piece — switch selection
+      const turn = this.game.turn();
+      const isOwnPiece = (turn === 'w' && piece.search(/^w/) !== -1) ||
+                          (turn === 'b' && piece.search(/^b/) !== -1);
+      if (isOwnPiece) {
+        this.clearHighlights();
+        this.selectedSquare = source;
+        this.highlightMoves(source);
+        return false;
+      }
+
+      // Tapped an enemy piece that isn't a legal target — deselect
+      this.clearHighlights();
+      this.selectedSquare = null;
+      return false;
+    }
+
+    // No piece selected — only allow own pieces
     const turn = this.game.turn();
     if ((turn === 'w' && piece.search(/^b/) !== -1) ||
         (turn === 'b' && piece.search(/^w/) !== -1)) {
@@ -468,6 +496,15 @@ const App = {
   onDrop(source, target) {
     if (this.isViewingHistory()) return 'snapback';
 
+    // Tap on same square = select this piece for tap-to-move
+    if (source === target) {
+      this.clearHighlights();
+      this.selectedSquare = source;
+      this.highlightMoves(source);
+      return 'snapback';
+    }
+
+    // Normal drag-and-drop move
     const move = this.game.move({
       from: source,
       to: target,
@@ -492,59 +529,41 @@ const App = {
 
   // ── Tap-to-Move ──────────────────────────────────────
 
-  onBoardClick(e) {
+  onEmptySquareClick(e) {
+    if (!this.selectedSquare) return;
     if (this.isViewingHistory()) return;
-    if (this.game.game_over()) return;
 
-    const squareEl = e.target.closest('[data-square]');
+    // Only handle clicks on empty squares (pieces are handled by onDragStart)
+    const target = e.touches ? e.touches[0].target : e.target;
+    if (target.matches('img[data-piece]')) return;
+
+    const squareEl = target.closest('[data-square]');
     if (!squareEl) return;
     const square = squareEl.getAttribute('data-square');
 
-    if (this.selectedSquare) {
-      const legalMoves = this.game.moves({ square: this.selectedSquare, verbose: true });
-      const matchingMove = legalMoves.find(m => m.to === square);
-
-      if (matchingMove) {
-        const move = this.game.move({
-          from: this.selectedSquare,
-          to: square,
-          promotion: 'q',
-        });
-        this.clearHighlights();
-        this.selectedSquare = null;
-        if (move) {
-          this.fullHistory.push(move);
-          this.viewIndex = this.fullHistory.length;
-          this.board.position(this.game.fen());
-          this.playSound(this.getSoundForMove(move));
-          this.updateMoveList();
-          this.updateStatus();
-          this.requestEval(this.game.fen());
-        }
-        return;
-      }
-
-      // Clicked a different own piece — switch selection
-      const piece = this.game.get(square);
-      if (piece && piece.color === this.game.turn()) {
-        this.clearHighlights();
-        this.selectedSquare = square;
-        this.highlightMoves(square);
-        return;
-      }
-
-      // Clicked empty/enemy square that isn't a legal target — deselect
+    const legalMoves = this.game.moves({ square: this.selectedSquare, verbose: true });
+    if (legalMoves.find(m => m.to === square)) {
+      e.preventDefault();
+      this.executeTapMove(this.selectedSquare, square);
+    } else {
       this.clearHighlights();
       this.selectedSquare = null;
-      return;
     }
+  },
 
-    // No piece selected — select if it's the current player's piece
-    const piece = this.game.get(square);
-    if (piece && piece.color === this.game.turn()) {
-      this.selectedSquare = square;
-      this.highlightMoves(square);
-    }
+  executeTapMove(from, to) {
+    const move = this.game.move({ from, to, promotion: 'q' });
+    this.clearHighlights();
+    this.selectedSquare = null;
+    if (!move) return;
+
+    this.fullHistory.push(move);
+    this.viewIndex = this.fullHistory.length;
+    this.board.position(this.game.fen());
+    this.playSound(this.getSoundForMove(move));
+    this.updateMoveList();
+    this.updateStatus();
+    this.requestEval(this.game.fen());
   },
 
   highlightMoves(square) {
