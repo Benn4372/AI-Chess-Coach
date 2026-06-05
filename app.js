@@ -30,6 +30,11 @@ const App = {
     this.initEngine();
     this.bindEvents();
     this.updateStatus();
+
+    // Initialize coach after DOM is ready
+    if (typeof Coach !== 'undefined') {
+      Coach.init();
+    }
   },
 
   cacheDOM() {
@@ -319,6 +324,11 @@ const App = {
         this._lastEval = null;
         this.classifyMoves();
         this.updateMoveList();
+
+        // Trigger coach triage on the move that was just evaluated
+        if (typeof Coach !== 'undefined' && this.viewIndex > 0 && this.viewIndex === this.fullHistory.length) {
+          Coach.onMoveEvaluated(this.viewIndex);
+        }
       }
       this.setEngineStatus(`Depth ${this.currentDepth}`, 'ready');
     }
@@ -521,6 +531,7 @@ const App = {
     this.updateMoveList();
     this.updateStatus();
     this.requestEval(this.game.fen());
+    if (typeof Coach !== 'undefined') Coach.updateCoachButton();
   },
 
   onSnapEnd() {
@@ -759,6 +770,7 @@ const App = {
     this.updateStatus();
     this.updateEvalBar({ type: 'cp', value: 0 });
     this.requestEval(this.game.fen());
+    if (typeof Coach !== 'undefined') Coach.resetForNewGame();
   },
 
   undoMove() {

@@ -44,7 +44,6 @@
         </div>
         <div id="board" class="board-container"></div>
       </div>
-      </div>
       <div id="engine-status" class="engine-status">Engine: loading...</div>
       <div id="game-status" class="game-status"></div>
       <div class="board-controls">
@@ -64,11 +63,14 @@
         <div id="move-list" class="move-list"></div>
       </div>
       <div class="panel-section panel-section--coach">
-        <h2 class="panel-heading">Coach</h2>
-        <div id="coach-messages" class="coach-messages">
-          <p class="coach-placeholder">Play a game and the coach will offer insights on key positions.</p>
+        <div class="coach-heading-row">
+          <h2 class="panel-heading">Coach</h2>
+          <span id="coach-tier" class="coach-tier">No Coach</span>
         </div>
-        <button id="btn-coach" class="coach-btn" disabled>Coach me on this move</button>
+        <div id="coach-messages" class="coach-messages">
+          <p class="coach-placeholder">Add your Claude API key in Settings to enable AI coaching.</p>
+        </div>
+        <button id="btn-coach" class="coach-btn" disabled title="Add a Claude API key in Settings to enable coaching">Coach me on this move</button>
       </div>
       <div class="panel-actions">
         <button id="btn-import" class="action-btn">Import PGN</button>
@@ -79,21 +81,37 @@
 
   <div id="settings-modal" class="modal-overlay" hidden>
     <div class="modal" role="dialog" aria-labelledby="settings-modal-title">
-      <h2 id="settings-modal-title" class="modal-title">Engine Settings</h2>
-      <div class="settings-group">
-        <label class="settings-label" for="engine-depth">
-          Analysis Depth: <span id="depth-value">16</span>
-        </label>
-        <input type="range" id="engine-depth" class="settings-range" min="10" max="20" value="16">
-        <p class="settings-hint">Higher depth = stronger analysis but slower</p>
+      <h2 id="settings-modal-title" class="modal-title">Settings</h2>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">Upgrade Coach</h3>
+        <p class="settings-hint">The app includes a free built-in coach (runs in your browser). For significantly better coaching with deeper positional understanding, add your <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic API key</a> to upgrade to Claude. Your key is stored only in your browser and sent directly to the Anthropic API.</p>
+        <div class="api-key-row">
+          <input type="password" id="api-key-input" class="api-key-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <button id="api-key-save" class="coach-btn api-key-save-btn">Save</button>
+          <button id="api-key-clear" class="action-btn api-key-clear-btn" style="display:none">Clear</button>
+        </div>
+        <p id="api-key-status" class="api-key-status">No API key set — add one to enable AI coaching</p>
       </div>
-      <div class="settings-group">
-        <label class="settings-label" for="engine-lines">
-          Analysis Lines: <span id="lines-value">1</span>
-        </label>
-        <input type="range" id="engine-lines" class="settings-range" min="1" max="3" value="1">
-        <p class="settings-hint">More lines show alternative moves</p>
+
+      <div class="settings-section">
+        <h3 class="settings-section-title">Engine</h3>
+        <div class="settings-group">
+          <label class="settings-label" for="engine-depth">
+            Analysis Depth: <span id="depth-value">16</span>
+          </label>
+          <input type="range" id="engine-depth" class="settings-range" min="10" max="20" value="16">
+          <p class="settings-hint">Higher depth = stronger analysis but slower</p>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label" for="engine-lines">
+            Analysis Lines: <span id="lines-value">1</span>
+          </label>
+          <input type="range" id="engine-lines" class="settings-range" min="1" max="3" value="1">
+          <p class="settings-hint">More lines show alternative moves</p>
+        </div>
       </div>
+
       <div class="modal-actions">
         <button id="settings-close" class="coach-btn">Done</button>
       </div>
@@ -122,5 +140,25 @@
   <script src="lib/chess-0.10.3.min.js"></script>
   <script src="lib/chessboard-1.0.0.min.js"></script>
   <script src="app.js"></script>
+  <script src="coach.js"></script>
+  <script type="module">
+    // WebLLM — loaded as ES module after app.js and coach.js are ready.
+    // Exposes window.webllm for coach.js, then kicks off model loading.
+    try {
+      const wllm = await import('https://esm.run/@mlc-ai/web-llm');
+      window.webllm = wllm;
+      // Coach is already initialized by DOMContentLoaded — trigger model load
+      if (typeof Coach !== 'undefined' && !Coach.apiKey && !Coach.localModelReady && !Coach.localModelLoading) {
+        Coach.initLocalModel();
+      }
+    } catch (e) {
+      console.warn('WebLLM failed to load:', e.message);
+      // Update the coach panel to show fallback
+      if (typeof Coach !== 'undefined' && !Coach.apiKey) {
+        Coach.localModelError = 'no-library';
+        Coach.updateCoachPanel();
+      }
+    }
+  </script>
 </body>
 </html>
