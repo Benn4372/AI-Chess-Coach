@@ -30,7 +30,7 @@ const Coach = {
   localModelReady: false,
   localModelError: null,
   webGPUSupported: null,       // null = not checked, true/false after check
-  LOCAL_MODEL_ID: 'Phi-3.5-mini-instruct-q4f16_1-MLC',
+  LOCAL_MODEL_ID: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
 
   // Consequence visualization state
   isShowingConsequence: false,
@@ -110,6 +110,11 @@ const Coach = {
     this.updateKeyUI();
 
     try {
+      // Request persistent storage to avoid quota issues with the model cache
+      if (navigator.storage && navigator.storage.persist) {
+        await navigator.storage.persist().catch(() => {});
+      }
+
       this.localEngine = await webllm.CreateMLCEngine(this.LOCAL_MODEL_ID, {
         initProgressCallback: (progress) => {
           this.onLocalModelProgress(progress);
@@ -965,7 +970,7 @@ Recent moves: ${recentMoves.trim()}`;
           <p class="coach-loading-title">Downloading your chess coach...</p>
           <progress id="local-model-progress" class="model-progress" value="0" max="1"></progress>
           <p id="local-model-progress-text" class="coach-loading-text">Preparing model...</p>
-          <p class="coach-loading-hint">One-time download (~1-2 GB). Cached for future visits.</p>
+          <p class="coach-loading-hint">One-time download. Cached for future visits.</p>
         </div>`;
     } else if (this.localModelError === 'no-webgpu') {
       // No WebGPU support (ACC-18: fallback message)
