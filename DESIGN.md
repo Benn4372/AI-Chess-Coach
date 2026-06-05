@@ -286,17 +286,22 @@ The user provides their own Anthropic API key, stored **only** in `localStorage`
 ## File Structure
 
 ```
-Chess Coach/
+AI Chess Coach/
 ├── index.html              # Single-page application entry point
 ├── style.css               # All styles (themes, layout, responsive)
-├── app.js                  # Main application logic
-├── engine-worker.js        # Stockfish Web Worker wrapper
-├── coach.js                # LLM integration, prompt construction, triage
-├── openings.json           # Lightweight ECO opening book
+├── app.js                  # Main application logic (incl. engine integration)
+├── coach.js                # LLM integration, prompt construction, triage (Phase 3)
+├── openings.json           # Lightweight ECO opening book (Phase 4)
+├── lib/                    # Vendored libraries
+│   ├── jquery-3.7.1.min.js
+│   ├── chess-0.10.3.min.js
+│   ├── chessboard-1.0.0.min.js
+│   └── chessboard-1.0.0.min.css
 ├── assets/
-│   ├── pieces/             # SVG piece images
-│   ├── sounds/             # Move, capture, check sounds
-│   └── stockfish/          # Stockfish WASM files
+│   ├── pieces/wikipedia/   # PNG piece images
+│   └── stockfish/          # Stockfish WASM + JS (loaded directly as Web Worker)
+├── .github/workflows/
+│   └── deploy.yml          # GitHub Pages CI/CD with cache busting
 ├── DESIGN.md               # This document
 └── README.md               # User-facing documentation
 ```
@@ -573,6 +578,14 @@ Hosting options: Railway, Fly.io, or a simple VPS. The API key now lives server-
 | API key management | localStorage (user provides) | Server-side (user authenticates instead) |
 | Training plans | N/A | Backend → Claude API (weekly generation) |
 | Hosting | GitHub Pages (free) | GitHub Pages + backend (Railway/Fly.io ~$5-10/mo) |
+
+---
+
+## Tech Debt & Cleanup
+
+| Item | Context | When to Remove |
+|---|---|---|
+| **Query-string cache busting** (`?v=<hash>` in `deploy.yml`) | `sed` rewrites `app.js` and `style.css` refs in `index.html` at deploy time to bust browser caches. Works but is fragile — breaks if filenames change or new assets are added. | Replace with a proper asset pipeline (e.g., Vite, esbuild) or service worker cache strategy once a build step is introduced. |
 
 ---
 

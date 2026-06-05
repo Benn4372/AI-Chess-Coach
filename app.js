@@ -9,6 +9,9 @@ const App = {
   viewIndex: 0,
   audioCtx: null,
 
+  // Tap-to-move state
+  selectedSquare: null,
+
   // Engine state
   engineWorker: null,
   engineReady: false,
@@ -106,6 +109,9 @@ const App = {
     this.els.evalBar.addEventListener('mouseleave', () => {
       this.els.evalLabel.style.opacity = '';
     });
+
+    // Tap-to-move on the board
+    this.els.board.addEventListener('click', (e) => this.onBoardClick(e));
 
     window.addEventListener('resize', () => this.board && this.board.resize());
   },
@@ -470,6 +476,8 @@ const App = {
 
     if (move === null) return 'snapback';
 
+    this.clearHighlights();
+    this.selectedSquare = null;
     this.fullHistory.push(move);
     this.viewIndex = this.fullHistory.length;
     this.playSound(this.getSoundForMove(move));
@@ -480,6 +488,84 @@ const App = {
 
   onSnapEnd() {
     this.board.position(this.game.fen());
+  },
+
+  // ── Tap-to-Move ──────────────────────────────────────
+
+  onBoardClick(e) {
+    if (this.isViewingHistory()) return;
+    if (this.game.game_over()) return;
+
+    const squareEl = e.target.closest('[data-square]');
+    if (!squareEl) return;
+    const square = squareEl.getAttribute('data-square');
+
+    if (this.selectedSquare) {
+      const legalMoves = this.game.moves({ square: this.selectedSquare, verbose: true });
+      const matchingMove = legalMoves.find(m => m.to === square);
+
+      if (matchingMove) {
+        const move = this.game.move({
+          from: this.selectedSquare,
+          to: square,
+          promotion: 'q',
+        });
+        this.clearHighlights();
+        this.selectedSquare = null;
+        if (move) {
+          this.fullHistory.push(move);
+          this.viewIndex = this.fullHistory.length;
+          this.board.position(this.game.fen());
+          this.playSound(this.getSoundForMove(move));
+          this.updateMoveList();
+          this.updateStatus();
+          this.requestEval(this.game.fen());
+        }
+        return;
+      }
+
+      // Clicked a different own piece — switch selection
+      const piece = this.game.get(square);
+      if (piece && piece.color === this.game.turn()) {
+        this.clearHighlights();
+        this.selectedSquare = square;
+        this.highlightMoves(square);
+        return;
+      }
+
+      // Clicked empty/enemy square that isn't a legal target — deselect
+      this.clearHighlights();
+      this.selectedSquare = null;
+      return;
+    }
+
+    // No piece selected — select if it's the current player's piece
+    const piece = this.game.get(square);
+    if (piece && piece.color === this.game.turn()) {
+      this.selectedSquare = square;
+      this.highlightMoves(square);
+    }
+  },
+
+  highlightMoves(square) {
+    const boardEl = this.els.board;
+    const srcEl = boardEl.querySelector(`[data-square="${square}"]`);
+    if (srcEl) srcEl.classList.add('square-selected');
+
+    const moves = this.game.moves({ square, verbose: true });
+    for (const move of moves) {
+      const targetEl = boardEl.querySelector(`[data-square="${move.to}"]`);
+      if (targetEl) {
+        targetEl.classList.add(move.captured ? 'square-capture-hint' : 'square-move-hint');
+      }
+    }
+  },
+
+  clearHighlights() {
+    const boardEl = this.els.board;
+    boardEl.querySelectorAll('.square-selected').forEach(el => el.classList.remove('square-selected'));
+    boardEl.querySelectorAll('.square-move-hint').forEach(el => el.classList.remove('square-move-hint'));
+    boardEl.querySelectorAll('.square-capture-hint').forEach(el => el.classList.remove('square-capture-hint'));
   },
 
   // ── Navigation ───────────────────────────────────────
