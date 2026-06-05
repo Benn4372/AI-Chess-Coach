@@ -133,10 +133,70 @@ body {
   gap: 0.75rem;
 }
 
+.board-with-eval {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
 .board-container {
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
+}
+
+/* ── Evaluation Bar ─────────────────────────────────── */
+.eval-bar {
+  position: relative;
+  width: 28px;
+  min-width: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #1a1a1a;
+  cursor: default;
+}
+
+.eval-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: #f0f0f0;
+  transition: height 0.5s ease;
+}
+
+.eval-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #888;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+  text-shadow: 0 0 3px rgba(0,0,0,0.5);
+}
+
+/* ── Engine Status ──────────────────────────────────── */
+.engine-status {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.engine-status.ready {
+  color: #4caf50;
+}
+
+.engine-status.analyzing {
+  color: var(--accent);
 }
 
 /* ── Game Status ─────────────────────────────────────── */
@@ -267,6 +327,26 @@ body {
   color: #fff !important;
   border-radius: 3px;
   font-weight: 600;
+}
+
+/* ── Move Classifications ───────────────────────────── */
+.move-brilliant { color: #26c6da !important; }
+.move-great    { color: #66bb6a !important; }
+.move-good     { color: #a5d6a7 !important; }
+.move-inaccuracy { color: #fdd835 !important; }
+.move-mistake  { color: #ffa726 !important; }
+.move-blunder  { color: #ef5350 !important; }
+
+.move-active.move-brilliant,
+.move-active.move-great,
+.move-active.move-good { background: #388e3c; }
+.move-active.move-inaccuracy { background: #f9a825; color: #000 !important; }
+.move-active.move-mistake { background: #e65100; }
+.move-active.move-blunder { background: #c62828; }
+
+.move-icon {
+  font-size: 0.7rem;
+  margin-left: 0.2rem;
 }
 
 /* ── Coach Messages ──────────────────────────────────── */
@@ -411,6 +491,31 @@ body {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+/* ── Settings Modal ─────────────────────────────────── */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.settings-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.settings-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
 /* ── Export Toast ─────────────────────────────────────── */
