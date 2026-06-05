@@ -5,12 +5,16 @@ const App = {
   board: null,
   game: null,
   orientation: 'white',
+  fullHistory: [],
+  viewIndex: 0,
+  audioCtx: null,
 
   init() {
     this.cacheDOM();
     this.loadTheme();
     this.initGame();
     this.initBoard();
+    this.initAudio();
     this.bindEvents();
     this.updateStatus();
   },
@@ -48,6 +52,10 @@ const App = {
     this.els.btnFlip.addEventListener('click', () => this.flipBoard());
     this.els.btnReset.addEventListener('click', () => this.resetGame());
     this.els.btnUndo.addEventListener('click', () => this.undoMove());
+    this.els.btnFirst.addEventListener('click', () => this.goToMove(0));
+    this.els.btnPrev.addEventListener('click', () => this.goToMove(this.viewIndex - 1));
+    this.els.btnNext.addEventListener('click', () => this.goToMove(this.viewIndex + 1));
+    this.els.btnLast.addEventListener('click', () => this.goToMove(this.fullHistory.length));
     this.els.btnImport.addEventListener('click', () => this.openImportModal());
     this.els.btnExport.addEventListener('click', () => this.exportPGN());
     this.els.pgnCancel.addEventListener('click', () => this.closeImportModal());
@@ -58,6 +66,8 @@ const App = {
 
     window.addEventListener('resize', () => this.board && this.board.resize());
   },
+
+  // ── Theme ────────────────────────────────────────────
 
   loadTheme() {
     const saved = localStorage.getItem('chess-coach-theme');
@@ -76,8 +86,92 @@ const App = {
     localStorage.setItem('chess-coach-theme', next);
   },
 
+  // ── Audio ────────────────────────────────────────────
+
+  initAudio() {
+    this.audioCtx = null; // lazy-init on first interaction
+  },
+
+  getAudioCtx() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return this.audioCtx;
+  },
+
+  playSound(type) {
+    try {
+      const ctx = this.getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      switch (type) {
+        case 'move':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, ctx.currentTime);
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.1);
+          break;
+        case 'capture':
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(400, ctx.currentTime);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.15);
+          break;
+        case 'check':
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(800, ctx.currentTime);
+          osc.frequency.setValueAtTime(1000, ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.06, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.2);
+          break;
+        case 'castle':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(500, ctx.currentTime);
+          osc.frequency.setValueAtTime(700, ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.18);
+          break;
+        case 'gameover':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523, ctx.currentTime);
+          osc.frequency.setValueAtTime(659, ctx.currentTime + 0.15);
+          osc.frequency.setValueAtTime(784, ctx.currentTime + 0.3);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.5);
+          break;
+      }
+    } catch (e) {
+      // Audio not available — silently ignore
+    }
+  },
+
+  getSoundForMove(move) {
+    if (move.san.includes('#')) return 'gameover';
+    if (move.san.includes('+')) return 'check';
+    if (move.san === 'O-O' || move.san === 'O-O-O') return 'castle';
+    if (move.flags.includes('c') || move.flags.includes('e')) return 'capture';
+    return 'move';
+  },
+
+  // ── Game & Board ─────────────────────────────────────
+
   initGame() {
     this.game = new Chess();
+    this.fullHistory = [];
+    this.viewIndex = 0;
   },
 
   initBoard() {
@@ -92,7 +186,12 @@ const App = {
     });
   },
 
+  isViewingHistory() {
+    return this.viewIndex < this.fullHistory.length;
+  },
+
   onDragStart(source, piece) {
+    if (this.isViewingHistory()) return false;
     if (this.game.game_over()) return false;
 
     const turn = this.game.turn();
@@ -103,6 +202,8 @@ const App = {
   },
 
   onDrop(source, target) {
+    if (this.isViewingHistory()) return 'snapback';
+
     const move = this.game.move({
       from: source,
       to: target,
@@ -111,6 +212,9 @@ const App = {
 
     if (move === null) return 'snapback';
 
+    this.fullHistory.push(move);
+    this.viewIndex = this.fullHistory.length;
+    this.playSound(this.getSoundForMove(move));
     this.updateMoveList();
     this.updateStatus();
   },
@@ -119,8 +223,37 @@ const App = {
     this.board.position(this.game.fen());
   },
 
+  // ── Navigation ───────────────────────────────────────
+
+  goToMove(index) {
+    index = Math.max(0, Math.min(index, this.fullHistory.length));
+    if (index === this.viewIndex) return;
+
+    this.viewIndex = index;
+
+    // Rebuild game state to the target move
+    this.game = new Chess();
+    for (let i = 0; i < this.viewIndex; i++) {
+      this.game.move(this.fullHistory[i].san);
+    }
+
+    this.board.position(this.game.fen(), false);
+    this.playSound('move');
+    this.updateMoveList();
+    this.updateStatus();
+  },
+
+  // ── Status & Move List ───────────────────────────────
+
   updateStatus() {
     const el = this.els.gameStatus;
+
+    if (this.isViewingHistory()) {
+      el.textContent = `Viewing move ${this.viewIndex} of ${this.fullHistory.length}`;
+      el.className = 'game-status status-history';
+      return;
+    }
+
     const turn = this.game.turn() === 'w' ? 'White' : 'Black';
 
     if (this.game.in_checkmate()) {
@@ -149,32 +282,47 @@ const App = {
   },
 
   updateMoveList() {
-    const history = this.game.history();
     const skill = this.els.skillLevel.value;
     const el = this.els.moveList;
 
-    if (history.length === 0) {
+    if (this.fullHistory.length === 0) {
       el.innerHTML = '';
       return;
     }
 
     let html = '<table class="move-table"><tbody>';
-    for (let i = 0; i < history.length; i += 2) {
+    for (let i = 0; i < this.fullHistory.length; i += 2) {
       const moveNum = Math.floor(i / 2) + 1;
-      const whiteMove = this.formatMove(history[i], skill);
-      const blackMove = history[i + 1] ? this.formatMove(history[i + 1], skill) : '';
-      const isLast = (i + 2 >= history.length);
+      const whiteMove = this.formatMove(this.fullHistory[i].san, skill);
+      const blackMove = this.fullHistory[i + 1]
+        ? this.formatMove(this.fullHistory[i + 1].san, skill)
+        : '';
 
-      html += `<tr${isLast ? ' class="move-current"' : ''}>`;
+      const whiteActive = (i + 1) === this.viewIndex ? ' move-active' : '';
+      const blackActive = (i + 2) === this.viewIndex ? ' move-active' : '';
+
+      html += '<tr>';
       html += `<td class="move-num">${moveNum}.</td>`;
-      html += `<td class="move-white">${whiteMove}</td>`;
-      html += `<td class="move-black">${blackMove}</td>`;
+      html += `<td class="move-white${whiteActive}" data-index="${i + 1}">${whiteMove}</td>`;
+      html += this.fullHistory[i + 1]
+        ? `<td class="move-black${blackActive}" data-index="${i + 2}">${blackMove}</td>`
+        : '<td class="move-black"></td>';
       html += '</tr>';
     }
     html += '</tbody></table>';
 
     el.innerHTML = html;
-    el.scrollTop = el.scrollHeight;
+
+    // Click on a move to navigate there
+    el.querySelectorAll('[data-index]').forEach(td => {
+      td.addEventListener('click', () => {
+        this.goToMove(parseInt(td.dataset.index, 10));
+      });
+    });
+
+    // Scroll active move into view
+    const active = el.querySelector('.move-active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
   },
 
   formatMove(san, skill) {
@@ -206,24 +354,43 @@ const App = {
     return text;
   },
 
+  // ── Board Controls ───────────────────────────────────
+
   flipBoard() {
     this.orientation = this.orientation === 'white' ? 'black' : 'white';
     this.board.orientation(this.orientation);
   },
 
   resetGame() {
-    this.game.reset();
+    this.game = new Chess();
+    this.fullHistory = [];
+    this.viewIndex = 0;
     this.board.start();
     this.updateMoveList();
     this.updateStatus();
   },
 
   undoMove() {
-    this.game.undo();
+    if (this.fullHistory.length === 0) return;
+
+    // If viewing history, jump to latest first
+    if (this.isViewingHistory()) {
+      this.goToMove(this.fullHistory.length);
+      return;
+    }
+
+    this.fullHistory.pop();
+    this.viewIndex = this.fullHistory.length;
+    this.game = new Chess();
+    for (const m of this.fullHistory) {
+      this.game.move(m.san);
+    }
     this.board.position(this.game.fen());
     this.updateMoveList();
     this.updateStatus();
   },
+
+  // ── PGN Import/Export ────────────────────────────────
 
   openImportModal() {
     this.els.pgnInput.value = '';
@@ -253,6 +420,8 @@ const App = {
       return;
     }
 
+    this.fullHistory = testGame.history({ verbose: true });
+    this.viewIndex = this.fullHistory.length;
     this.game = testGame;
     this.board.position(this.game.fen());
     this.updateMoveList();
@@ -262,7 +431,13 @@ const App = {
   },
 
   exportPGN() {
-    const pgn = this.game.pgn();
+    // Rebuild full game for export (in case we're viewing history)
+    const exportGame = new Chess();
+    for (const m of this.fullHistory) {
+      exportGame.move(m.san);
+    }
+    const pgn = exportGame.pgn();
+
     if (!pgn) {
       this.showToast('No moves to export');
       return;

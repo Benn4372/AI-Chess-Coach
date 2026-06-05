@@ -163,6 +163,11 @@ body {
   font-weight: 600;
 }
 
+.status-history {
+  color: #ab47bc;
+  font-weight: 600;
+}
+
 .board-controls {
   display: flex;
   gap: 0.4rem;
@@ -257,8 +262,10 @@ body {
   color: var(--accent);
 }
 
-.move-current td {
-  color: var(--text-primary);
+.move-active {
+  background: var(--accent);
+  color: #fff !important;
+  border-radius: 3px;
   font-weight: 600;
 }
 
